@@ -2,6 +2,8 @@
 
 # SR Link
 
+Officially hosted at https://srdiscord.link
+
 Links a player's Discord account to their Sub Rosa account.
 
 - **Pseudo Sub Rosa Server** (`subrosa/`): A passworded server that a player needs to enter a 6 digit code given from the Discord app, and the connect screen shows the result.
