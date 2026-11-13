@@ -163,7 +163,11 @@ function link_server.on_join_request(join, ip, port)
 		end
 	end
 
-	local link, replaced_discord_id = db.redeem_code(code, auth)
+	local link, reason = db.redeem_code(code, auth)
+	if reason == "already_linked" then
+		return link_server.reply(key, ip, port, "This Sub Rosa or Discord account is already linked.")
+	end
+
 	if not link then
 		for _, wrong_code_key in ipairs(wrong_code_keys) do
 			local wrong = link_server.wrong_codes[wrong_code_key] or { count = 0, since = uv.now() }
@@ -183,10 +187,7 @@ function link_server.on_join_request(join, ip, port)
 	)
 	link_server.reply(key, ip, port, "Linked to Discord: " .. link.discord_name)
 
-	linked_roles.update_later(link.discord_id, true)
-	if replaced_discord_id then
-		linked_roles.update_later(replaced_discord_id, false)
-	end
+	linked_roles.update_later(link.discord_id)
 end
 
 link_server.handlers = {

@@ -82,24 +82,23 @@ end
 ---@param code string
 ---@param player table
 ---@return table|nil link
----@return string|nil replaced_discord_id
+---@return string|nil reason "invalid_code" or "already_linked" when there is no link
 local function redeem(code, player)
 	local found = row("SELECT discord_id, discord_name FROM codes WHERE code = ? AND expires_at >= ?", code, os.time())
 	if not found then
-		return nil
+		return nil, "invalid_code"
 	end
 	local discord_id, discord_name = found[1], found[2]
-	local previous = db.find_link("steam_id", player.steam_id)
-	local replaced_id
-	if previous and previous.discord_id ~= discord_id then
-		replaced_id = previous.discord_id
+	row("DELETE FROM codes WHERE code = ?", code)
+
+	-- links are permanent, so a banned player can't move their game account to a new Discord account
+	if db.find_link("discord_id", discord_id) or db.find_link("steam_id", player.steam_id) then
+		return nil, "already_linked"
 	end
 
-	row("DELETE FROM codes WHERE code = ?", code)
-	row("DELETE FROM links WHERE discord_id = ? OR steam_id = ?", discord_id, player.steam_id)
 	row("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?)", discord_id, discord_name, player.steam_id,
 		tostring(player.phone_number), player.player_name, os.time())
-	return db.find_link("discord_id", discord_id), replaced_id
+	return db.find_link("discord_id", discord_id)
 end
 
 ---@param discord_id string
@@ -119,17 +118,18 @@ end
 
 ---@param code string 6 digit code
 ---@param player table { steam_id, phone_number, player_name } from the master server's auth packet
----@return table|nil link the new link, nil when the code is unknown or expired
----@return string|nil replaced_discord_id the Discord user who had this Sub Rosa account before, if someone else
+---@return table|nil link the new link
+---@return string|nil reason "invalid_code" when the code is unknown or expired, "already_linked" when either account
+--- was linked before
 function db.redeem_code(code, player)
 	conn:exec("BEGIN IMMEDIATE")
-	local ok, link, replaced = pcall(redeem, code, player)
+	local ok, link, reason = pcall(redeem, code, player)
 	if not ok then
 		conn:exec("ROLLBACK")
 		error(link, 0)
 	end
 	conn:exec("COMMIT")
-	return link, replaced
+	return link, reason
 end
 
 ---@param column string "discord_id" or "steam_id"
@@ -149,14 +149,6 @@ function db.find_link(column, value)
 		game_name = found[5],
 		linked_at = found[6],
 	}
-end
-
----@param discord_id string
----@return boolean removed false when nothing was linked
-function db.unlink(discord_id)
-	local removed = db.find_link("discord_id", discord_id) ~= nil
-	row("DELETE FROM links WHERE discord_id = ?", discord_id)
-	return removed
 end
 
 ---@param discord_id string

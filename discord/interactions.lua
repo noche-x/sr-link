@@ -4,7 +4,6 @@ local ffi = require("ffi")
 
 local config = require("../config")
 local db = require("../db")
-local linked_roles = require("./linked_roles")
 
 
 -- from Discord's interaction docs
@@ -19,7 +18,6 @@ local COMPONENT_ROW = 1
 local COMPONENT_BUTTON = 2
 local STYLE_BLUE = 1
 local STYLE_GREY = 2
-local STYLE_RED = 4
 
 local EVP_PKEY_ED25519 = 1087
 
@@ -103,14 +101,16 @@ function interactions.button(id, label, style)
 end
 
 ---@param text string
----@param buttons table list of interactions.button
+---@param buttons table list of interactions.button, empty removes them
 ---@return table message
 function interactions.panel(text, buttons)
-	return {
-		content = text,
-		flags = FLAG_EPHEMERAL,
-		components = { { type = COMPONENT_ROW, components = buttons } },
-	}
+	-- discord rejects empty rows
+	local components = {}
+	if #buttons > 0 then
+		components[1] = { type = COMPONENT_ROW, components = buttons }
+	end
+
+	return { content = text, flags = FLAG_EPHEMERAL, components = components }
 end
 
 ---@param user table Discord user
@@ -125,16 +125,18 @@ function interactions.status_panel(user)
 
 	return interactions.panel(
 		("**Linked** to Sub Rosa account **%s** (phone %s)."):format(link.game_name, link.phone_number),
-		{
-			interactions.button("generate", "Link a different account", STYLE_GREY),
-			interactions.button("unlink", "Unlink", STYLE_RED),
-		}
+		{}
 	)
 end
 
 ---@param user table Discord user
 ---@return table message
 function interactions.code_panel(user)
+	-- the code panel's new code button stays after linking
+	if db.find_link("discord_id", user.id) then
+		return interactions.status_panel(user)
+	end
+
 	local code, expires_at = db.create_code(user.id, user.global_name or user.username)
 	local text = table.concat({
 		("Your link code: **`%s`** (expires <t:%d:R>)"):format(code, expires_at),
@@ -150,26 +152,9 @@ function interactions.code_panel(user)
 	})
 end
 
----@param user table Discord user
----@return table message
-function interactions.unlink_panel(user)
-	if not db.unlink(user.id) then
-		return interactions.panel("Nothing was linked.", {
-			interactions.button("generate", "Generate link code", STYLE_BLUE),
-		})
-	end
-
-	linked_roles.update_later(user.id)
-
-	return interactions.panel("Unlinked.", {
-		interactions.button("generate", "Generate link code", STYLE_BLUE),
-	})
-end
-
 interactions.button_panels = {
 	generate = interactions.code_panel,
 	status = interactions.status_panel,
-	unlink = interactions.unlink_panel,
 }
 
 ---@param interaction table decoded request body
