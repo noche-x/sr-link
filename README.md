@@ -45,7 +45,7 @@ Create an app in the [Discord Developer Portal](https://discord.com/developers/a
 Then in the app's settings:
 
 - **General Information**: set Interactions Endpoint URL to `PUBLIC_URL/interactions` and Linked Roles Verification URL to `PUBLIC_URL/linked-role`.
-- **OAuth2**: add `PUBLIC_URL/oauth/callback` as a redirect.
+- **OAuth2**: add `PUBLIC_URL/oauth/callback` and `PUBLIC_URL/install/callback` as redirects.
 - **Installation**: enable User Install and Guild Install. Guild Install is there so servers can add the app for Linked Roles.
 
 Discord pings the interactions endpoint when you save it, so the app has to be running first.

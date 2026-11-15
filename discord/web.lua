@@ -5,6 +5,7 @@ local json = require("json")
 local path = require("path")
 local openssl = require("openssl")
 local url = require("url")
+local querystring = require("querystring")
 local http = require("coro-http")
 
 local config = require("../config")
@@ -110,10 +111,25 @@ end
 
 function web.on_home()
 	local html = web.render("home.html", {
-		install_url = "https://discord.com/oauth2/authorize?client_id=" .. config.discord_application_id,
+		install_url = "https://discord.com/oauth2/authorize?" .. querystring.stringify({
+			client_id = config.discord_application_id,
+			integration_type = "1",
+			redirect_uri = config.public_url .. "/install/callback",
+			response_type = "code",
+			scope = "applications.commands",
+		}),
 		server_name = config.server_name,
 	})
 	return web.respond(200, "text/html; charset=utf-8", html)
+end
+
+function web.on_install_callback(head, body, query)
+	if query.error or type(query.code) ~= "string" or query.code == "" then
+		return web.respond_page(400, "Installation not completed", "Return to the home page and try again.")
+	end
+
+	local html = web.render("installed.html", { server_name = config.server_name })
+	return web.respond(200, "text/html; charset=utf-8", html, { { "Referrer-Policy", "no-referrer" } })
 end
 
 function web.on_icon()
@@ -169,7 +185,8 @@ function web.on_sign_in_callback(head, body, query)
 		return web.respond_page(
 			200,
 			"Not linked yet",
-			"Open the Sub Rosa Link app in Discord, generate a code, and join the link server with it. "
+			"Run /link anywhere in Discord, or right-click your profile image and choose Apps → SR Link → Sub Rosa Link. "
+				.. "Generate a code and join the link server with it. "
 				.. "Your roles update by themselves once you are linked.",
 			headers
 		)
@@ -186,6 +203,7 @@ end
 web.routes = {
 	["GET /"] = web.on_home,
 	["GET /icon.png"] = web.on_icon,
+	["GET /install/callback"] = web.on_install_callback,
 	["POST /interactions"] = web.on_interaction,
 	["GET /linked-role"] = web.on_linked_role,
 	["GET /oauth/callback"] = web.on_sign_in_callback,

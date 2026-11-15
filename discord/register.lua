@@ -16,6 +16,13 @@ return function()
 	local app = config.discord_application_id
 
 	api.request("PUT", ("/applications/%s/commands"):format(app), authorization, {
+		{
+			type = 1,
+			name = "link",
+			description = "Link your Sub Rosa account",
+			integration_types = USER_INSTALL,
+			contexts = EVERYWHERE,
+		},
 		-- app launcher button, handler 1 sends the click to us instead of an activity
 		{
 			type = 4,
