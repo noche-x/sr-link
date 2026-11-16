@@ -217,6 +217,7 @@ web.routes = {
 	["GET /oauth/callback"] = web.on_sign_in_callback,
 	["GET /privacy"] = web.static_page("privacy.html"),
 	["GET /terms"] = web.static_page("terms.html"),
+	["GET /terms-of-service"] = web.static_page("terms.html"),
 }
 
 ---@param head table
