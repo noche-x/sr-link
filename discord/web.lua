@@ -220,15 +220,29 @@ web.routes = {
 	["GET /terms-of-service"] = web.static_page("terms.html"),
 }
 
+---@type table<string, boolean> pages that also answer HEAD, which link checkers like Discord's send
+web.head_paths = {
+	["/"] = true,
+	["/privacy"] = true,
+	["/terms"] = true,
+	["/terms-of-service"] = true,
+}
+
 ---@param head table
 ---@param body string
 ---@return table head
 ---@return string body
 function web.on_request(head, body)
 	local request_url = url.parse(head.path, true)
-	local route = web.routes[head.method .. " " .. request_url.pathname]
+	-- HEAD only mirrors the pages that are safe to repeat, the callbacks must not run for it
+	local method = head.method
+	if method == "HEAD" and web.head_paths[request_url.pathname] then
+		method = "GET"
+	end
+
+	local route = web.routes[method .. " " .. request_url.pathname]
 	if not route then
-		return web.respond(404, "text/plain", "not found")
+		return web.respond(404, "text/plain", head.method == "HEAD" and "" or "not found")
 	end
 
 	-- an error here would drop the connection without an answer
@@ -236,6 +250,10 @@ function web.on_request(head, body)
 	if not ok then
 		print(("%s %s failed: %s"):format(head.method, request_url.pathname, tostring(response_head)))
 		return web.respond(500, "text/plain", "internal error")
+	end
+
+	if head.method == "HEAD" then
+		return response_head, ""
 	end
 
 	return response_head, response_body
