@@ -1,10 +1,14 @@
 -- Link codes, links and Discord OAuth tokens, stored in SQLite.
 --
+-- Names, phone numbers and tokens are AES-256-GCM encrypted by field_cipher. discord_id and steam_id stay plain
+-- because links are looked up by them.
+--
 -- Times are REAL seconds since the epoch. IDs and phone numbers are TEXT, because SQLite INTEGER columns come back
 -- as int64 cdata from the binding.
 local openssl = require("openssl")
 local sqlite3 = require("sqlite3")
 local config = require("./config")
+local field_cipher = require("./field_cipher")
 
 local CODE_LIFETIME = 5 * 60
 
@@ -48,6 +52,18 @@ local function row(query, ...)
 	return result
 end
 
+---@param owner string discord id the value belongs to, for the error message
+---@param column string
+---@param stored string
+---@return string value
+local function decrypt_field(owner, column, stored)
+	local ok, value = pcall(field_cipher.decrypt, stored)
+	if not ok then
+		error(("cannot decrypt %s of %s: %s"):format(column, owner, value), 0)
+	end
+	return value
+end
+
 ---@return string code
 local function random_code()
 	-- values at or above the largest multiple of a million would make low codes more likely, so they are redrawn
@@ -74,7 +90,7 @@ local function insert_code(discord_id, discord_name)
 		code = random_code()
 	end
 	local expires_at = now + CODE_LIFETIME
-	row("INSERT INTO codes VALUES (?, ?, ?, ?)", code, discord_id, discord_name, expires_at)
+	row("INSERT INTO codes VALUES (?, ?, ?, ?)", code, discord_id, field_cipher.encrypt(discord_name), expires_at)
 	return code, expires_at
 end
 
@@ -88,7 +104,8 @@ local function redeem(code, player)
 	if not found then
 		return nil, "invalid_code"
 	end
-	local discord_id, discord_name = found[1], found[2]
+	-- the name is copied as it is stored, still encrypted
+	local discord_id, stored_discord_name = found[1], found[2]
 	row("DELETE FROM codes WHERE code = ?", code)
 
 	-- links are permanent, so a banned player can't move their game account to a new Discord account
@@ -96,8 +113,15 @@ local function redeem(code, player)
 		return nil, "already_linked"
 	end
 
-	row("INSERT INTO links VALUES (?, ?, ?, ?, ?, ?)", discord_id, discord_name, player.steam_id,
-		tostring(player.phone_number), player.player_name, os.time())
+	row(
+		"INSERT INTO links VALUES (?, ?, ?, ?, ?, ?)",
+		discord_id,
+		stored_discord_name,
+		player.steam_id,
+		field_cipher.encrypt(tostring(player.phone_number)),
+		field_cipher.encrypt(player.player_name),
+		os.time()
+	)
 	return db.find_link("discord_id", discord_id)
 end
 
@@ -143,10 +167,10 @@ function db.find_link(column, value)
 	end
 	return {
 		discord_id = found[1],
-		discord_name = found[2],
+		discord_name = decrypt_field(found[1], "discord_name", found[2]),
 		steam_id = found[3],
-		phone_number = found[4],
-		game_name = found[5],
+		phone_number = decrypt_field(found[1], "phone_number", found[4]),
+		game_name = decrypt_field(found[1], "game_name", found[5]),
 		linked_at = found[6],
 	}
 end
@@ -156,7 +180,13 @@ end
 ---@param refresh_token string
 ---@param expires_at number seconds since the epoch
 function db.save_tokens(discord_id, access_token, refresh_token, expires_at)
-	row("INSERT OR REPLACE INTO tokens VALUES (?, ?, ?, ?)", discord_id, access_token, refresh_token, expires_at)
+	row(
+		"INSERT OR REPLACE INTO tokens VALUES (?, ?, ?, ?)",
+		discord_id,
+		field_cipher.encrypt(access_token),
+		field_cipher.encrypt(refresh_token),
+		expires_at
+	)
 end
 
 ---@param discord_id string
@@ -166,7 +196,12 @@ function db.find_tokens(discord_id)
 	if not found then
 		return nil
 	end
-	return { access_token = found[1], refresh_token = found[2], expires_at = found[3] }
+
+	return {
+		access_token = decrypt_field(discord_id, "access_token", found[1]),
+		refresh_token = decrypt_field(discord_id, "refresh_token", found[2]),
+		expires_at = found[3],
+	}
 end
 
 ---@param discord_id string

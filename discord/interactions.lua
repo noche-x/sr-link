@@ -168,7 +168,7 @@ function interactions.handle(interaction)
 	-- member.user in servers, user in dms
 	local user = interaction.member and interaction.member.user or interaction.user
 
-	-- app launcher and the user menu command
+	-- the slash command and the user menu command
 	if interaction.type == INTERACTION_COMMAND then
 		return { type = RESPONSE_MESSAGE, data = interactions.status_panel(user) }
 	end

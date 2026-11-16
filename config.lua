@@ -30,6 +30,13 @@ config.database = read_env("DATABASE", "links.db")
 config.discord_application_id = read_env("DISCORD_APPLICATION_ID")
 config.discord_public_key = read_env("DISCORD_PUBLIC_KEY")
 config.discord_client_secret = read_env("DISCORD_CLIENT_SECRET")
+-- the key for every encrypted column, the name is older than the personal fields
+local token_key_hex = read_env("TOKEN_ENCRYPTION_KEY")
+if not token_key_hex:match("^" .. ("%x"):rep(64) .. "$") then
+	error("TOKEN_ENCRYPTION_KEY must be 64 hex characters, make one with `openssl rand -hex 32`", 0)
+end
+config.token_key = require("openssl").hex(token_key_hex, false)
+
 -- only `luvit main.lua register` needs it
 config.discord_bot_token = process.env.DISCORD_BOT_TOKEN
 

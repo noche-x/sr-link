@@ -23,15 +23,6 @@ return function()
 			integration_types = USER_INSTALL,
 			contexts = EVERYWHERE,
 		},
-		-- app launcher button, handler 1 sends the click to us instead of an activity
-		{
-			type = 4,
-			handler = 1,
-			name = "launch",
-			description = "Link your Sub Rosa account",
-			integration_types = USER_INSTALL,
-			contexts = EVERYWHERE,
-		},
 		-- right click a user, Apps, Sub Rosa Link
 		{
 			type = 2,

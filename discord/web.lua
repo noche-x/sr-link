@@ -111,25 +111,13 @@ end
 
 function web.on_home()
 	local html = web.render("home.html", {
+		-- the app's own install link, a custom redirect_uri left the install unfinished for some users
 		install_url = "https://discord.com/oauth2/authorize?" .. querystring.stringify({
 			client_id = config.discord_application_id,
-			integration_type = "1",
-			redirect_uri = config.public_url .. "/install/callback",
-			response_type = "code",
-			scope = "applications.commands",
 		}),
 		server_name = config.server_name,
 	})
 	return web.respond(200, "text/html; charset=utf-8", html)
-end
-
-function web.on_install_callback(head, body, query)
-	if query.error or type(query.code) ~= "string" or query.code == "" then
-		return web.respond_page(400, "Installation not completed", "Return to the home page and try again.")
-	end
-
-	local html = web.render("installed.html", { server_name = config.server_name })
-	return web.respond(200, "text/html; charset=utf-8", html, { { "Referrer-Policy", "no-referrer" } })
 end
 
 ---@param name string html file next to this one
@@ -211,7 +199,6 @@ end
 web.routes = {
 	["GET /"] = web.on_home,
 	["GET /icon.png"] = web.on_icon,
-	["GET /install/callback"] = web.on_install_callback,
 	["POST /interactions"] = web.on_interaction,
 	["GET /linked-role"] = web.on_linked_role,
 	["GET /oauth/callback"] = web.on_sign_in_callback,
