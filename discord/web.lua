@@ -132,6 +132,14 @@ function web.on_install_callback(head, body, query)
 	return web.respond(200, "text/html; charset=utf-8", html, { { "Referrer-Policy", "no-referrer" } })
 end
 
+---@param name string html file next to this one
+---@return fun(): table, string handler
+function web.static_page(name)
+	return function()
+		return web.respond(200, "text/html; charset=utf-8", web.render(name, {}))
+	end
+end
+
 function web.on_icon()
 	return web.respond(200, "image/png", fs.readFileSync(path.join(module.dir, "icon.png")))
 end
@@ -207,6 +215,8 @@ web.routes = {
 	["POST /interactions"] = web.on_interaction,
 	["GET /linked-role"] = web.on_linked_role,
 	["GET /oauth/callback"] = web.on_sign_in_callback,
+	["GET /privacy"] = web.static_page("privacy.html"),
+	["GET /terms"] = web.static_page("terms.html"),
 }
 
 ---@param head table
